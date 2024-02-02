@@ -1,0 +1,527 @@
+Reentract Lock
+ReentrantLock.lockInterruptibly()
+ReentrantLock.tryLock();
+
+tryLock() -> try to acquire lock
+
+Reentrant lock provides many methods used for production testing.
+
+We can add fairness to the Reentrant Lock
+new ReentrantLock(true);
+
+Using fairness can slow the throughput.
+
+LockInterruptibly
+reentrantLock.lockInterruptibly() allows the suspended thread to be interrupted when the lock is being acquired by other thread,
+otherwise the thread blocks and waits.
+
+tryLock
+return trues if lock is available not make the thread to block and wait.
+Result in efficient application.
+
+
+Real time applications where suspendind a thread on lock() method is unacceptable.
+Examples:
+1. Video/Image Processing
+2. High Speed/Low latency trading systems
+3. User interface applications.
+
+ReentrantReadWriteLock
+Race Conditions Require:
+1. Multiple threads sharing a resource.
+2. At least one thread modifying the resource.
+
+Solution - complete mutual exclusion by (Reentrant Lock and Synchronized keyword)
+Regardless of the operation(read, write) only allow one thread to CS.
+But what about the workloads that requires mostly reading and very low writes ? 
+
+Synchronized keyword and ReentrantLock don't allow multiple readers to access a shared resource concurrently. When read operations are predominant
+or when read operations are not as fast, mutual exclusion of reading threads negatively impacts the performance.
+
+ReentrantReadWriteLock helps in this situation.
+readLock - when reading the C.S
+writeLock - when modifying the C.S
+
+readLock keeps count of how many reader threads are currently holding the lock.
+Only single thread allowed to write.
+Mutual Exclusion between reader and write threads.
+1. If writeLock is acquired by one thread, no readLock can be acquired.
+2. While one thread is having the readLock, no thread can acquire the writeLock.
+
+Summary
+Using regular binary locks with read intensive workloads, prevents concurrent reads from shared resource.
+
+ReentrantReadWriteLock
+1. ReadLock
+2. WriteLock
+3. Allow multiple readers, read shared resources concurrently
+
+Read intensive use-cases where we increased the performance and finished 3x faster.
+ReentrantReadWriteLock is not always better than a conventional lock.
+
+Semaphore
+
+Producer-Consumer Problem
+
+Can be used to restrict the number of "users" to a particular resource or group of resources.
+
+Unlike locks that allows only one "user" per resource.
+The semaphores can restrict any given number of users to a resource.
+
+Semaphore semaphore = new Semaphore(NUMBER_OF_PERMITS);
+semaphore.acquire(5); // 5 permits acquired at a time
+semaphore.release(5);
+
+Lock as a special case of semaphore with 1 permit.
+
+Semaphore doesn't have notion of owner thread.
+Same thread can acquire the semaphore multiple times.
+The binary semaphore is not reentrant.
+
+Semaphore can be released by any thread even the thread that have not acquired it.
+
+Can lead to bugs.
+
+Semaphores is great choice for other problems like Producer Consumer Problem.
+
+Condition variables- 
+
+Condition.await()
+void await() - unlock lock, wait until signalled.
+void signal() - wakes up a single thread, waiting on the condition variable.
+The thread that wakes up need to reacquire the lock associated with the condition variable.
+
+If currently no thread is waiting on condition variable, the signal method do nothing.
+signalAll() - broadcast signal to all threads waiting on condition variable.
+
+doesn't need to know how many threads holding the condition variable.
+
+wait(), notify(), notifyAll() methods for inter thread communication.
+
+Any Object can be used as condition variable.
+
+Implement back pressure to guard against OutOfMemoryException.
+
+
+Lock Free Algorithms and Data Techniques
+
+What's wrong with locks.
+
+Majority of multi-threaded programming is still done with locks(synchronized, ReentrantLock, ReentrantReadWriteLock, etc.)
+Most of the concurrency programs are easier and safer to solve with locks.
+
+Problems and limitations with locks
+1. Deadlocks - The more lock, more chances of deadlock.
+2. Slow Critical Section
+3. Priority Inversion 
+4. Thread not releasing the lock
+
+Performance overhead in having contention over a lock.
+Thread A acquires the lock
+Thread B tries to acquire a lock and gets blocked.
+Thread B is scheduled out.(context switch)
+Thread B is scheduled back.(context switch)
+Additional overhead may not be noticeable for most applications.
+
+Why do we need locks ? 
+Multiple threads accessing shared resources.
+At least one thread was modifying the resource.
+Non atomic operations
+
+Non atomic operations - Reason
+Non atomic operation on one shared resource.
+A single Java application turns into one or more hardware operations.
+
+Example count++ turns into 3 hardware instructions:
+-> Read the value of count
+->Calculate new value
+-> Store new value to count
+
+Lock Free Solution - Breakdown
+Utilize operations which are guaranteed to be one hardware operation.
+
+A single hardware operation is
+Atomic
+Thread Safe
+
+Atomic Operations
+1. Read/Assignment on all primitive types (except for long and double)
+2. Read/Assignment on all references.
+3. Read/Assignment on volatile long and double.
+
+Avoiding Data Races
+Read/Assignment on all volatile primitive types and references.
+
+
+AtomicX Classes
+
+AtomicIntegers - Pros and Cons
+
+Pros
+1. Simplicity
+2. No need for locks and synchronization
+3. No race conditions or data races
+
+Cons
+1. Only the operation itself is atomic.
+2.There's still race condition between 2 separate atomic operations.
+
+There's still race condition between following two operations:
+atomicInteger.incrementAndGet();
+atomicInteger.addAndGet(-1);
+
+AtomicInteger is an excellent tool for concurrent counting, without the complexity of using a  lock.
+
+AtomicInteger should be used only when atomic operations are needed.
+
+It's on par and sometimes more performant than a regular integer with a lock as protection.
+
+If used only by a single thread, a regular integer is preferred.
+
+CompareAndSet is used in all AtomicReference 
+
+We are doing push and pop in a while(true) loop because multiple threads are doing push and pop operations at the same time, and it might take them few operations
+to succeed.
+
+if(head.compareAndSet(currentHeadNode, newHeadNode)) returns false then it means between the get and set operations the head has changed. So we need to do 
+all those operations again.
+LockSupport.getNanos(1) we wait for 1 nanosecond and try again.
+
+214512742
+
+AtomicReference<T> - wraps a reference to an object, allows us to perform atomic operations on that reference, including the compareAndSet(...)
+CompareAndSet(..) - Atomic operation available in all atomic classes.
+Lock free stack outperformed the blocking stack by over 200%.
+
+
+private static class Metric {
+	private static class InternalMetric {
+		public long count;
+		public long sum;
+	}
+
+	private AtomicReference<InternalMatric> internalMatric = new AtomicReference<>(new InternalMetric());
+		
+	public void addSample(long sample) {
+		InternalMetric currentState, newState;
+
+		do {
+			currentState = internalMetric.get();
+			newState = new InternalMetric();
+			newState.sum = currentState.sum + sample;
+			newState.count = currentState.count + 1;
+		} while(!internalMetric.compareAndSet(currentState, newState));
+	}
+
+	public double getAverage() {
+		InternalMetric newResetState = new InternalMetric();
+		InternalMetric currentState;
+		double average;
+		do {
+			currentState = internalMetric.get();
+			average = (double)currentState.sum/currentState.count;
+		} while(!internalMetric.compareAndSet(currentState, newResetState)); 
+		return average;	
+	}	
+}
+
+Negative Impacts of Blocking on Locks
+
+Blocking IO
+
+CPU -> direct access -> Main Memory
+
+CPU -> not direct access -> External Devices
+
+CPU -> send instructions -> to controller of external devices -> to output or receive some data
+
+Until the request is not arrived from the device, the CPU can continue its tasks. As soon as the response is arrived, the CPU gets an interrupt,
+then CPU read data from device using special OS routine or driver.
+
+Direct Memory Access
+
+Through DMA, CPU gives instructions to the device controller to read/write data to memory.
+
+Only when the copying of data is complete, the CPU gets the notification of the operation complete.
+
+The CPU continues running its tasks, only when it has to transfer data to any device or when data has completed sending the data, the CPU reads/writes data.
+
+Consequences of Blocking IO on performance
+
+Thread Polling
+
+Logic behind a Fixed Size Thread Pool
+
+We can reuse the same threads for the entire application.
+Eliminate the overhead of: 
+1. Creating
+2. Starting
+3. Shutting Down 
+for every new thread for every task
+
+Optimal Size of Threads = Number of Cores in the CPU
+
+Assumptions
+Tasks involving only CPU operations
+No Blocking Calls.
+No Blocking IO Calls.
+
+Online Store Web Application 
+
+HTTP Request -> Web Application (Single Core CPU) -> Database -> Product Review, Prices -> HTTP Response -> User
+
+parseUserRequest and sendPageToUser are fast operations but to getDataFromRemoteDatabase is a slow operation (Blocking IO operation).
+
+During retrieving data from database is a IO bound operation and CPU is idle during this time.
+
+If any new request comes during the IO bound operation, CPU can handle it as it has time but due to single thread blocked due to IO, the request 
+stays in the queue and is processed when the first request is complete.
+
+Most of the Web Applications are IO bound, either waiting on external service, or waiting response from database, waiting for user request to arrive,
+or loading a web page like html, css, or js.
+
+Another application of IO Bound application is big data processing/transformation application. Waiting for reading file from disk, or storing the file 
+in another location.
+
+Important Observations
+
+1. When a task involves blocking calls, '#threads = #cores'
+   a. Doesn't give the best performance. 
+   b. Doesn't give the best CPU utilization.
+
+2. Even if just a few long blocks impact the performance of entire application.
+
+If only a few requests need the database access, still the CPU is idle for most of the time and not utilized efficiently.
+
+
+The CPU is not involved in long IO operations.
+Blocking calls impact the performance of the entire application.
+
+Introduction to Thread-Per-Task Threading Model
+
+When new Request arrives, schedule a thread. In this way, in a single core machine, we can achieve multi threading.
+On a 2 core machine, 2 threads can run parallely, while others only run concurrently.
+
+If N requests arrive a multithreaded web applications and we have N threads and these threads do IO bound operations like reading from database.
+If each thread takes 1 second to read from database, then N requests can be completed in 1 second as they run concurrently.
+
+Performance Analysis
+
+Improved throughput and hardware utilization.
+Processed tasks concurrently and completed them faster than in the thread-per-core model.
+
+
+Issues
+1. Threads are expensive.
+Number of threads we can create is limited.
+Threads consume stack memory and other resources.
+Too many threads - Our application will crash
+Too few threads - Lower throughput and CPU utilization.
+
+Price of Context Switches - 
+1. OS is trying to fully utilize the CPU.
+2. As soon as there's a blocking call, the OS unschedules the thread.
+3. Too many threads and frequent blocking calls, leads to the CPU being busy running the OS code.
+
+Thrashing
+A situation where most of the CPU time is spent on the OS managing the system.
+
+Conclusion
+Thread-per-task has been the standard for many decades
+It will not give the optimal
+ Performance
+ CPU Utilization
+
+Used the Thread-per-Task/Thread-per-Request threading model 
+ Allows processing thousands of tasks concurrently.
+Issues:
+Can create a limited number of threads.
+Too many threads - Application may crash
+Too few threads - Poor performance
+Potential Thrashing
+
+Additinal Issues of Thread Per Task Threading Model
+
+Does not give us optimal performance.
+1. When a thread is blocking on IO, it cannot be used.
+2. Requires us to allocate more threads.
+3. Consumes more resources.
+4. Adding overhead of context-switches.
+
+Example,
+Suppose we have a web application that sends 50% of the requests to the External Service and 50% of the requests to the Database.
+If the external service becomes slow due to high load, performance bug. Because of the slowness, our application may become out of threads because all 
+of those threads are busy waiting for response from the external service. This effects 100% of our users, even though only 50% of them require data from
+the external service.
+This is called inversion of control as instead of us controlling the external service by sending the requests, it starts controlling our web application 
+whenever there is issue in the external service.
+
+Stability issues due to inversion of control.
+
+Non-Blocking IO
+
+When we call the non-blocking IO operation, the thread doesnot block. Instead it returns immediately and continues the next operation,
+Therefore, the non-blocking IO takes a call back.
+
+Non blocking IO version is Async operation
+public void handleRequest(HttpExchange exchange) {
+	Request request = parseUserRequest(exchange);
+	readFromDatabaseAsync(request, (data) => {
+		sendPageToUser(data, exchange);
+	});
+}
+
+Now when the request comes to the thread it will call the non blocking IO, but instead of waiting for response, it will be available of second request.
+
+As our request handling thread doesnot block, we don't need to create more threads than cores. No overhead of context switches as there are no context switches.
+We can create  only as many threads as cores. 
+
+Non Blocking IO with as many threads as number of cores.
+No inversion of control.
+
+If the external service becomes unresponsive, only the users requesting from external service will become blocked. Other users will not be blocked.
+Callbacks that need to run after getting response from external service either will be not called at all, or will get executed with a long delay.
+
+Benefits: 
+1. Thread per core + Non Blocking IO provides optimal performance.
+
+Thread per core -> best for CPU bound operations 
+Thread per task -> may be one option for IO, and CPU bound operations but has disadvantages like Control Inversion
+Thread per core with Non Blocking IO -> best for CPU  + IO bound operations.
+Stability and Security against issues or crashes of other systems.
+
+Issues of Non Blocking IO
+1. Code Readability for code that requires multiple Blocking IOs dependant on previous Blocking IOs.
+In case of Non Blocking IO the code will not be easily readable.
+Deep callback is known as Callback hell
+
+Very Hard APIs
+1. Non Blocking IO OS methods are very hard to work with.
+2. JDK provides only a very thin layer of abstraction on top of those low level APIs.
+3. Most projects use third party libraries like:
+ a. netty
+ b. vert.x
+ c. webflux
+
+which increases the complexity of our code and size of our application.
+
+
+	        	Blocking IO + Thread-Per-Task          Non-Blocking IO + Thread-per-core
+Performance 		 High memory and context switch            Optimal
+Safety/Stability               Inversion of control                No issues
+Code Writing                    Easy                               Hard
+Code Reading                    Easy                               Hard
+Testing                         Easy                               Hard
+Debugging                       Easy                               Hard
+
+Learned about Non-Blocking IO:
+  a. Can be used with Thread-per-Core model
+  b. Improves performance.
+  c. Minimizes context switch and memory overhead.
+  d. Makes our system more stable.
+
+Non-Blocking IO has many drawbacks:
+  a. Hard to write, read, test and debug code.
+  b. Dependency on external frameworks and libraries increases as jdk on its own does not provide easy ways to write code for non blocking IO.
+
+
+Virtual Thread
+Java Threads and OS Threads
+
+When we create a thread object with run code and start method, when we call the start method, the thread object asks the OS to start and run a 
+OS thread belonging to our application process and ask the JVM to allocate a fixed size stack space to store the thread's local variables.
+Then the OS is fully responsible for scheduling and running that OS thread on CPU along with other OS threads. The thread inside the JVM is a thin wrapper
+around the OS thread.Each platform thread/JVM thread is expensive as each Platfrom thread is mapped to a OS thread one to one, which is a limited
+resource and also tied to a static stack space within the JVM. 
+
+Virtual Threads
+
+Newer Type of Thread, as part of JDK-21.
+Fully Managed By JVM, Does not come with a fixed size stack. Like Virtual Threads, it contains a run method.
+OS is not even aware of it and doesn't manage it.
+Virtual Thread like any Java object is allocated on the Heap and can be garbage collected.
+Virtual Threads are cheap to create unlike Platform Threads.
+As soon as we create virtual threads, JVM internally creates a small pool of Platform Threads.
+To run a virtual thread, it mounts it on a platform thread
+When a virtual thread is mounted on a platform thread, that platform thread is called the carrier thread.
+When the virtual thread finishes its execution, the JVM unmounts the thread from the carrier and make the platform 
+thread available for other virtual thread.
+If the thread is no longer needed the JVM puts it in garbage collector. However if the virtual thread is not finished and is unable to 
+make any progress, the JVM unmounts it and save its current state on heap.
+The state contains the Instruction Pointer and snapshot of the stack.
+When thread A is unmounted, another virtual thread B can be mounted on the same platform thread. 
+Later when thread A wants to start, it looks for any available platform thread. If it founds, then it is mounted on it and the IP and snapshot of stack
+is copied to the IP and stack memory of the platform thread.
+We as developers have very little control over carrier threads and the scheduling of virtual threads over them.
+
+Performance / Throughput Gain with Virtual Threads 
+If virtual threads represent only CPU Operations:
+	. No performance benefit
+	. Just an abstraction for scheduling tasks on a pool of platform threads.
+	
+If Virtual Threads represent operations that require the thread to wait(blocking operations)
+	. Very useful for performance/throughput.
+	
+In Thread-per-task model, whenever a new request comes, we create a virtual thread and mount it on given pool of platform thread.
+Now, whenever there is blocking operation like reading from database, the virtual thread is unmounted and next request can be served
+from same platform thread. Thus we achieve non - blocking operations. There is however some latency due to unmounting and mounting of 
+virtual threads.
+
+                                 Blocking I/O + Thread-per-Task           Non-Blocking I/O  + Thread per Core      Virtual Threads
+Performance								High memory & Context                     Optimal                             Optimal
+											Switches
+
+Stability/Safety                        Inversion of Control                      No Issues                           No Issues
+
+Code Writing                            Easy										Hard								Easy 
+
+Code Reading                            Easy 										Hard								Easy
+
+Testing                                 Easy										Hard								Easy
+
+Debugging								Easy										Hard								Easy
+
+Many blocking operations were refactored to support virtual threads.
+
+Some of these operations are:
+1. Sleep  	  	  - Thread.sleep()
+2. Lock   	  	  - ReentrantLock.lock()
+3. Semaphores 	  - Semaphore.acquire()
+4. Networking api - Socket/Datagram (TCP/UDP)
+ 
+ 
+Thread-safety
+ Race - condition
+ Deadlocks
+ Data Races
+apply to virtual threads.
+
+Virtual Threads can be thought of as a abstraction over platform threads.
+All the Inter-Thread Communication, Lock free algorithms apply over virtual threads as they were applied over platform threads.
+
+At Tasks Involving only CPU Tasks 
+
+Virtual Threads provide NO benefit.
+Virtual Threads provide NO benefit over latency.
+The only benefit we get from Virtual Threads is increased throughput.
+Short and Frequent blocking calls are very inefficient.
+If we have to make such calls in our code, we can use virtual threads.
+
+Thread-per-Task with Platform threads introduce context switches.
+Thread-per-Task model with virtual threads have only mounting/unmounting overhead.
+
+Batch short IO Operations into less frequent, long IO operations.
+
+Best Practices
+
+1. Never create fixed size pool of virtual threads.
+
+Preferred way of using Virtual Threads is using 
+Executors.newVirtualThreadPerTaskExecutor()
+
+
+2. Virtual Threads are always daemon.
+virtualThread.setDaemon() -> throws an exception
+
+3. Virtual Threads have default priority.
+Value set is simply ignored.
